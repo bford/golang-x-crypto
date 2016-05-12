@@ -684,10 +684,37 @@ func (p *ExtendedGroupElement) Zero() {
 	FeZero(&p.T)
 }
 
+// Set p to the standard base-point.
+func (p *ExtendedGroupElement) Base() {
+	*p = baseExt
+}
+
 func (p *ExtendedGroupElement) Double(r *CompletedGroupElement) {
 	var q ProjectiveGroupElement
 	p.ToProjective(&q)
 	q.Double(r)
+}
+
+// Set p to the sum of group-elements a and b.
+// The target p may overlap with inputs a and/or b.
+func (p *ExtendedGroupElement) Add(a, b *ExtendedGroupElement) {
+	var cb CachedGroupElement
+	var r CompletedGroupElement
+
+	b.ToCached(&cb)
+	geAdd(&r, a, &cb)
+	r.ToExtended(p)
+}
+
+// Set p to the difference of group-elements a and b (the result of a-b).
+// The target p may overlap with inputs a and/or b.
+func (p *ExtendedGroupElement) Sub(a, b *ExtendedGroupElement) {
+	var cb CachedGroupElement
+	var r CompletedGroupElement
+
+	b.ToCached(&cb)
+	geAdd(&r, a, &cb)
+	r.ToExtended(p)
 }
 
 func (p *ExtendedGroupElement) ToCached(r *CachedGroupElement) {
