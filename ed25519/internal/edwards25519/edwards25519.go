@@ -684,11 +684,6 @@ func (p *ExtendedGroupElement) Zero() {
 	FeZero(&p.T)
 }
 
-// Set p to the standard base-point.
-func (p *ExtendedGroupElement) Base() {
-	*p = baseExt
-}
-
 func (p *ExtendedGroupElement) Double(r *CompletedGroupElement) {
 	var q ProjectiveGroupElement
 	p.ToProjective(&q)
@@ -713,7 +708,7 @@ func (p *ExtendedGroupElement) Sub(a, b *ExtendedGroupElement) {
 	var r CompletedGroupElement
 
 	b.ToCached(&cb)
-	geAdd(&r, a, &cb)
+	geSub(&r, a, &cb)
 	r.ToExtended(p)
 }
 

@@ -5,7 +5,7 @@
 package cosi
 
 import (
-	"encoding/hex"
+	//"encoding/hex"
 	"testing"
 )
 
@@ -24,7 +24,6 @@ func testCosign(t *testing.T, message []byte, priKey []PrivateKey,
 	n := len(priKey)
 
 	aggK := cos.AggregatePublicKey()
-println("aggK: ", hex.EncodeToString(aggK))
 
 	// Create the individual commits and corresponding secrets
 	// (these would be done by the individual participants in practice)
@@ -32,7 +31,6 @@ println("aggK: ", hex.EncodeToString(aggK))
 	secret := make([]*Secret, n)
 	for i := range commit {
 		commit[i], secret[i], _ = Commit(nil)
-println("commit: ", hex.EncodeToString(commit[i]))
 	}
 
 	// Leader: combine the individual commits into an aggregate commit
@@ -57,17 +55,18 @@ println("commit: ", hex.EncodeToString(commit[i]))
 func TestSignVerify(t *testing.T) {
 
 	// Create a number of distinct keypairs
-	n := 1
+	n := 10
 	pubKey := make([]PublicKey, n)
 	priKey := make([]PrivateKey, n)
 	for i := range pubKey {
 		pubKey[i], priKey[i], _ = GenerateKey(constReader{byte(i)})
-println("pubkey",i,":",hex.EncodeToString(pubKey[i]))
 	}
 	cosigners := NewCosigners(pubKey, nil) // enable all
 
 	// collectively sign a test message
 	message := []byte("test message")
+	cosigners.SetMaskBit(5, Disabled)
+	cosigners.SetMaskBit(5, Enabled)
 	sig := testCosign(t, message, priKey, cosigners)
 	if !cosigners.Verify(message, sig) {
 		t.Errorf("valid signature rejected")
@@ -76,6 +75,26 @@ println("pubkey",i,":",hex.EncodeToString(pubKey[i]))
 	wrongMessage := []byte("wrong message")
 	if cosigners.Verify(wrongMessage, sig) {
 		t.Errorf("signature of different message accepted")
+	}
+
+	// now collectively sign with only a partial cosigners set
+	cosigners.SetMaskBit(5, Disabled)
+	sig = testCosign(t, message, priKey, cosigners)
+	if cosigners.Verify(message, sig) {
+		t.Errorf("signature with too few cosigners accepted")
+	}
+
+	// now reduce the verification threshold
+	cosigners.SetPolicy(ThresholdPolicy(n-1))
+	if !cosigners.Verify(message, sig) {
+		t.Errorf("valid threshold not accepted")
+	}
+
+	// now remove another cosigner and make sure it breaks again
+	cosigners.SetMaskBit(7, Disabled)
+	sig = testCosign(t, message, priKey, cosigners)
+	if cosigners.Verify(message, sig) {
+		t.Errorf("signature with too few cosigners accepted")
 	}
 }
 

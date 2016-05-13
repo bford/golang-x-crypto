@@ -20,7 +20,7 @@ import (
 	"io"
 	"strconv"
 	"math/big"
-	"encoding/hex"
+	//"encoding/hex"
 
 	"golang.org/x/crypto/ed25519/internal/edwards25519"
 )
@@ -39,6 +39,13 @@ type PublicKey []byte
 
 // PrivateKey is the type of Ed25519 private keys. It implements crypto.Signer.
 type PrivateKey []byte
+
+
+type MaskBit bool
+const (
+	Enabled MaskBit = false
+	Disabled MaskBit = true
+)
 
 // Public returns the PublicKey corresponding to priv.
 func (priv PrivateKey) Public() crypto.PublicKey {
@@ -85,20 +92,22 @@ func GenerateKey(rand io.Reader) (publicKey PublicKey, privateKey PrivateKey, er
 // deciding what cosigner sets are and aren't sufficient
 // for a collective signature to be considered valid.
 type Policy interface {
-	Check(cosigners Cosigners) bool
+	Check(cosigners *Cosigners) bool
 }
 
 // The default, conservative policy
 // just requires all participants to have signed.
 type fullPolicy struct{}
+func (_ fullPolicy) Check(cosigners *Cosigners) bool {
+	return cosigners.CountEnabled() == cosigners.CountTotal()
+}
 
-func (_ fullPolicy) Check(cosigners Cosigners) bool {
-	for i := range cos.keys {
-		if cos.Disabled(i) {
-			return false
-		}
-	}
-	return true
+type thresPolicy struct{ t int }
+func (p thresPolicy) Check(cosigners *Cosigners) bool {
+	return cosigners.CountEnabled() >= p.t
+}
+func ThresholdPolicy(threshold int) Policy {
+	return &thresPolicy{threshold}
 }
 
 // XXX add simple threshold policy
@@ -164,12 +173,9 @@ func Cosign(privateKey PrivateKey, secret *Secret,
 	var hramDigest [64]byte
 	h.Reset()
 	h.Write(aggregateR)
-println("cosign: aggR ", hex.EncodeToString(aggregateR[:]))
 	h.Write(aggregateK)
-println("cosign: aggK ", hex.EncodeToString(privateKey[32:]))
 	h.Write(message)
 	h.Sum(hramDigest[:0])
-println("cosign: digest ", hex.EncodeToString(hramDigest[:]))
 
 	var hramDigestReduced [32]byte
 	edwards25519.ScReduce(&hramDigestReduced, &hramDigest)
@@ -197,6 +203,9 @@ type Cosigners struct {
 
 	// cached aggregate of all enabled cosigners' public keys
 	aggr edwards25519.ExtendedGroupElement
+
+	// cosigner-presence policy for checking signatures
+	policy Policy
 }
 
 func NewCosigners(publicKeys []PublicKey, mask []byte) *Cosigners {
@@ -210,16 +219,28 @@ func NewCosigners(publicKeys []PublicKey, mask []byte) *Cosigners {
 		}
 	}
 	cos.SetMask(mask)
+	cos.policy = &fullPolicy{}
 	return cos
 }
 
-func (cos *Cosigners) Count() int {
+func (cos *Cosigners) CountTotal() int {
 	return len(cos.keys)
 }
 
-func (cos *Cosigners) PublicKeys() []PublicKey {
-	return cos.keys
+func (cos *Cosigners) CountEnabled() int {
+	// Yes, we could count zero-bits much more efficiently...
+	count := 0
+	for i := range cos.keys {
+		if cos.MaskBit(i) == Enabled {
+			count++
+		}
+	}
+	return count
 }
+
+//func (cos *Cosigners) PublicKeys() []PublicKey {
+//	return cos.keys
+//}
 
 func (cos *Cosigners) SetMask(mask []byte) {
 	cos.mask.SetInt64(0)
@@ -250,23 +271,22 @@ func (cos *Cosigners) MaskLen() int {
 	return (len(cos.keys)+7) >> 3
 }
 
-// Enable a given signer (clearing its bit in the mask)
-func (cos *Cosigners) Enable(signer int) {
-	if cos.mask.Bit(signer) == 1 {
-		cos.mask.SetBit(&cos.mask, signer, 0)	// enable
-		cos.aggr.Add(&cos.aggr, &cos.keys[signer])
+// Enable or disable a given signer
+func (cos *Cosigners) SetMaskBit(signer int, bit MaskBit) {
+	if bit == Disabled {				// disable
+		if cos.mask.Bit(signer) == 0 {		// was enabled
+			cos.mask.SetBit(&cos.mask, signer, 1)
+			cos.aggr.Sub(&cos.aggr, &cos.keys[signer])
+		}
+	} else {					// enable
+		if cos.mask.Bit(signer) == 1 {		// was disabled
+			cos.mask.SetBit(&cos.mask, signer, 0)
+			cos.aggr.Add(&cos.aggr, &cos.keys[signer])
+		}
 	}
 }
 
-// Disable a given signer (setting its bit in the mask)
-func (cos *Cosigners) Disable(signer int) {
-	if cos.mask.Bit(signer) == 0 {
-		cos.mask.SetBit(&cos.mask, signer, 1)	// disable
-		cos.aggr.Sub(&cos.aggr, &cos.keys[signer])
-	}
-}
-
-func (cos *Cosigners) Disabled(signer int) bool {
+func (cos *Cosigners) MaskBit(signer int) (bit MaskBit) {
 	return cos.mask.Bit(signer) != 0
 }
 
@@ -286,7 +306,7 @@ func (cos *Cosigners) AggregateCommit(commits [][]byte) []byte {
 
 	aggR.Zero()
 	for i := range cos.keys {
-		if cos.Disabled(i) {
+		if cos.MaskBit(i) == Disabled {
 			continue
 		}
 
@@ -316,7 +336,7 @@ func (cos *Cosigners) AggregateSignature(aggregateR []byte, sigParts [][]byte) [
 
 	var aggS, indivS [32]byte
 	for i := range cos.keys {
-		if cos.Disabled(i) {
+		if cos.MaskBit(i) == Disabled {
 			continue
 		}
 
@@ -324,10 +344,8 @@ func (cos *Cosigners) AggregateSignature(aggregateR []byte, sigParts [][]byte) [
 			return nil
 		}
 		copy(indivS[:], sigParts[i])
-println("S",i,":",hex.EncodeToString(indivS[:]))
 		edwards25519.ScMulAdd(&aggS, &aggS, &scOne, &indivS)
 	}
-println("aggS:",hex.EncodeToString(aggS[:]))
 
 	mask := cos.Mask()
 	cosigSize := SignatureSize + len(mask)
@@ -360,7 +378,7 @@ func (cos *Cosigners) Verify(message, sig []byte) bool {
 	cos.SetMask(sig[64:])
 
 	// Check that this prepresents a sufficient set of signers
-	if !cos.policy.Check() {
+	if !cos.policy.Check(cos) {
 		return false
 	}
 
@@ -380,13 +398,10 @@ func (cos *Cosigners) verify(message, aggR, sigR, sigS []byte,
 
 	h := sha512.New()
 	h.Write(aggR)
-println("verify: aggR ", hex.EncodeToString(aggR[:]))
 	h.Write(aggK[:])
-println("verify: aggK ", hex.EncodeToString(aggK[:]))
 	h.Write(message)
 	var digest [64]byte
 	h.Sum(digest[:0])
-println("verify: digest ", hex.EncodeToString(digest[:]))
 
 	var hReduced [32]byte
 	edwards25519.ScReduce(&hReduced, &digest)
@@ -403,5 +418,9 @@ println("verify: digest ", hex.EncodeToString(digest[:]))
 	var checkR [32]byte
 	projR.ToBytes(&checkR)
 	return subtle.ConstantTimeCompare(sigR, checkR[:]) == 1
+}
+
+func (cos *Cosigners) SetPolicy(policy Policy) {
+	cos.policy = policy	
 }
 
