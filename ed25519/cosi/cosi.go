@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package cosi implements Ed25519 collective signatures.
+// Package cosi provides a minimal implementation
+// of collective signatures based on the Ed25519 signature scheme.
 // A collective signature allows many participants to
 // validate and sign a message collaboratively,
 // to produce a single compact multisignature that can be verified
-// almost as quickly and efficiently as a single individual signature.
+// almost as quickly and efficiently as a normal individual signature.
 // Despite their compactness, collective signatures nevertheless
 // record exactly which subset of participants signed a given message,
 // to tolerate unavailable participants and support arbitrary policies
@@ -154,7 +155,7 @@
 // using message-validation logic suitable to the application.
 // Cosigners need not necessarily validate the message at all
 // if their purpose is merely to provide transparency
-// by publicly "witnessing" the signing of the message.
+// by "witnessing" and publicly logging the signed message.
 // If the cosigner is willing to sign,
 // it calls the Commit function to produce a signing commitment,
 // returning this commitment to the leader
@@ -199,13 +200,13 @@
 // raise an alarm, and restart the signing process without that cosigner.
 // If VerifyPart indicates each individual signature part is valid,
 // then the final collective signature produced by AggregateSignature
-// will also be valid (unless the leader itself is buggy).
+// will also be valid, unless the leader itself is buggy.
 //
 // Efficiency Considerations
 //
-// Each Cosigners object caches some cryptographic state -
+// The Cosigners object caches some cryptographic state -
 // namely the aggregate public key returned by AggregatePublicKey -
-// reflecting the current participation bitmask.
+// reflecting the cosigners' public keys and the current participation bitmask.
 // The SetMask and SetMaskBit functions, which change the participation bitmask,
 // updates the cached cryptographic state accordingly.
 // As a result, both collective signing and verification operations
@@ -214,16 +215,17 @@
 // participation bitmask.
 //
 // Drastically changing the bitmask therefore incurs some computational cost.
-// This cost is unlikely to be particular noticeable
-// unless the total number of cosigners' public keys is quite large, however
+// This cost is unlikely to be particularly noticeable, however,
+// unless the total number of cosigners' public keys is quite large
 // (e.g., thousands),
 // because updating the cached aggregate public key requires only
-// an elliptic curve point addition or subtraction operation per cosigner.
+// an elliptic curve point addition or subtraction operation
+// per cosigner added or removed.
 // Point addition and subtraction operations are extremely inexpensive
-// compared to the scalar multiplication operations that represent
-// a constant cost in collective signing or verification,
+// compared to the scalar multiplication operations,
+// which represent a constant base cost in collective signing or verification,
 // so these constant costs will typically dominate
-// whene the list of cosigners is small.
+// when the list of cosigners is small.
 package cosi
 
 import (
