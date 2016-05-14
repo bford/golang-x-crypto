@@ -7,6 +7,8 @@ package cosi
 import (
 	//"encoding/hex"
 	"testing"
+
+	"golang.org/x/crypto/ed25519"
 )
 
 type constReader struct{ val byte }
@@ -18,7 +20,7 @@ func (cr constReader) Read(buf []byte) (int, error) {
 	return len(buf), nil
 }
 
-func testCosign(t *testing.T, message []byte, priKey []PrivateKey,
+func testCosign(t *testing.T, message []byte, priKey []ed25519.PrivateKey,
 		cos *Cosigners) []byte {
 
 	n := len(priKey)
@@ -56,12 +58,12 @@ func TestSignVerify(t *testing.T) {
 
 	// Create a number of distinct keypairs
 	n := 10
-	pubKey := make([]PublicKey, n)
-	priKey := make([]PrivateKey, n)
+	pubKey := make([]ed25519.PublicKey, n)
+	priKey := make([]ed25519.PrivateKey, n)
 	for i := range pubKey {
-		pubKey[i], priKey[i], _ = GenerateKey(constReader{byte(i)})
+		pubKey[i], priKey[i], _ = ed25519.GenerateKey(constReader{byte(i)})
 	}
-	cosigners := NewCosigners(pubKey, nil) // enable all
+	cosigners := NewCosigners(pubKey) // enable all
 
 	// collectively sign a test message
 	message := []byte("test message")
@@ -101,7 +103,7 @@ func TestSignVerify(t *testing.T) {
 /* XXX 
 func BenchmarkSigning(b *testing.B) {
 	var zero zeroReader
-	_, priv, err := GenerateKey(zero)
+	_, priv, err := ed25519.GenerateKey(zero)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -114,7 +116,7 @@ func BenchmarkSigning(b *testing.B) {
 
 func BenchmarkVerification(b *testing.B) {
 	var zero zeroReader
-	pub, priv, err := GenerateKey(zero)
+	pub, priv, err := ed25519.GenerateKey(zero)
 	if err != nil {
 		b.Fatal(err)
 	}
