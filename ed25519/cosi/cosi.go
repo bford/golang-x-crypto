@@ -254,9 +254,15 @@ const (
 
 
 // Commitment represents a byte-slice used in the collective signing process,
-// which cosigners produce and send to the leader for use in its call
-// to AggregateCommit.
+// which cosigners produce via Commit and send to the leader
+// for combination via AggregateCommit.
 type Commitment []byte
+
+// SignaturePart represents a byte-slice used in collective signing,
+// which cosigners produce via Cosign and send to the leader
+// for combination via AggregateSignature.
+type SignaturePart []byte
+
 
 // Policy represents a fully customizable cosigning policy
 // deciding what cosigner sets are and aren't sufficient
@@ -349,8 +355,8 @@ func Commit(rand io.Reader) (Commitment, *Secret, error) {
 // Since it is security-critical that a particular Secret be used only once,
 // Cosign invalidates the secret when it is called,
 // and panics if called with a previously-used secret.
-func Cosign(privateKey ed25519.PrivateKey, secret *Secret,
-		message, aggregateK, aggregateR []byte) []byte {
+func Cosign(privateKey ed25519.PrivateKey, secret *Secret, message []byte,
+	aggregateK ed25519.PublicKey, aggregateR Commitment) SignaturePart {
 
 	if l := len(privateKey); l != ed25519.PrivateKeySize {
 		panic("ed25519: bad private key length: " + strconv.Itoa(l))
@@ -550,7 +556,7 @@ func (cos *Cosigners) AggregatePublicKey() ed25519.PublicKey {
 // The commits slice must have length equal to the total number of cosigners,
 // but AggregateCommit uses only the entries corresponding to cosigners
 // that are enabled in the participation mask.
-func (cos *Cosigners) AggregateCommit(commits [][]byte) []byte {
+func (cos *Cosigners) AggregateCommit(commits []Commitment) []byte {
 
 	var aggR, indivR edwards25519.ExtendedGroupElement
 	var commitBytes [32]byte
@@ -586,7 +592,7 @@ var scOne = [32]byte{1}
 // that are enabled in the participation mask,
 // which must be identical to the one
 // the leader previously used during AggregateCommit.
-func (cos *Cosigners) AggregateSignature(aggregateR []byte, sigParts [][]byte) []byte {
+func (cos *Cosigners) AggregateSignature(aggregateR Commitment, sigParts []SignaturePart) []byte {
 
 	if l := len(aggregateR); l != ed25519.PublicKeySize {
 		panic("ed25519: bad aggregateR length: " + strconv.Itoa(l))
@@ -623,7 +629,7 @@ func (cos *Cosigners) AggregateSignature(aggregateR []byte, sigParts [][]byte) [
 // In such a situation, the leader cannot complete this signing round,
 // but can restart the collective signing process (with new commits)
 // after excluding the buggy or malicious cosigner.
-func (cos *Cosigners) VerifyPart(message, aggR []byte,
+func (cos *Cosigners) VerifyPart(message, aggR Commitment,
 				signer int, indR, indS []byte) bool {
 
 	return cos.verify(message, aggR, indR, indS, cos.keys[signer])

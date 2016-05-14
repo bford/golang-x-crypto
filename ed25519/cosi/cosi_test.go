@@ -29,7 +29,7 @@ func testCosign(t *testing.T, message []byte, priKey []ed25519.PrivateKey,
 
 	// Create the individual commits and corresponding secrets
 	// (these would be done by the individual participants in practice)
-	commit := make([][]byte, n)
+	commit := make([]Commitment, n)
 	secret := make([]*Secret, n)
 	for i := range commit {
 		commit[i], secret[i], _ = Commit(nil)
@@ -39,7 +39,7 @@ func testCosign(t *testing.T, message []byte, priKey []ed25519.PrivateKey,
 	aggR := cos.AggregateCommit(commit)
 
 	// Create the individual signature parts
-	sigpart := make([][]byte, n)
+	sigpart := make([]SignaturePart, n)
 	for i := range sigpart {
 		sigpart[i] = Cosign(priKey[i], secret[i], message, aggK, aggR)
 
@@ -67,8 +67,6 @@ func TestSignVerify(t *testing.T) {
 
 	// collectively sign a test message
 	message := []byte("test message")
-	cosigners.SetMaskBit(5, Disabled)
-	cosigners.SetMaskBit(5, Enabled)
 	sig := testCosign(t, message, priKey, cosigners)
 	if !cosigners.Verify(message, sig) {
 		t.Errorf("valid signature rejected")
