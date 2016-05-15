@@ -8,7 +8,8 @@ import (
 	//"encoding/hex"
 	"testing"
 
-	"golang.org/x/crypto/ed25519"
+	//"golang.org/x/crypto/ed25519"
+	"github.com/bford/golang-x-crypto/ed25519"
 )
 
 type constReader struct{ val byte }

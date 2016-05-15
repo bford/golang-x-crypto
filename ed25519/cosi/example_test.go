@@ -3,8 +3,10 @@ package cosi_test
 import (
 	"fmt"
 
-	"golang.org/x/crypto/ed25519"
-	"golang.org/x/crypto/ed25519/cosi"
+	//"golang.org/x/crypto/ed25519"
+	//"golang.org/x/crypto/ed25519/cosi"
+	"github.com/bford/golang-x-crypto/ed25519"
+	"github.com/bford/golang-x-crypto/ed25519/cosi"
 )
 
 // This example demonstrates how to generate a
