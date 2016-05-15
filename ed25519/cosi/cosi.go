@@ -38,8 +38,8 @@
 // Public Keys for Collective Signing and Verification
 //
 // In a conventional signing scheme such as basic Ed25519,
-// the individual signer uses a public key to sign a message,
-// and verifiers use the corresponding private key to check its validity.
+// the individual signer uses a private key to sign a message,
+// and verifiers use the corresponding public key to check its validity.
 // Collective signing involves using a set of key pairs:
 // the holders of multiple distinct private keys collaborate to sign a message,
 // and to verify the resulting collective signature,
