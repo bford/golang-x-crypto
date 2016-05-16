@@ -90,7 +90,7 @@
 // and "peer-to-peer" key management as implemented by PGP for example.
 // This practice becomes even more essential in collective signing, however,
 // because if a malicious participant is allowed to "claim" any public key
-// without proviing knowledge of its corresponding private key,
+// without proving knowledge of its corresponding private key,
 // then the participant can use so-called "related-key attacks"
 // to produce signatures that appear to be signed by other group members
 // but in fact were signed only by the one malicious signer.

@@ -82,7 +82,7 @@ func (cos *Cosigners) Verify(message, sig []byte) bool {
 	// Update our mask to reflect which cosigners actually signed
 	cos.SetMask(sig[64:])
 
-	// Check that this prepresents a sufficient set of signers
+	// Check that this represents a sufficient set of signers
 	if !cos.policy.Check(cos) {
 		return false
 	}
