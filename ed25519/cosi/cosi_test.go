@@ -75,7 +75,13 @@ func TestSignVerify(t *testing.T) {
 	// Create a number of distinct keypairs
 	n := 10
 	genKeys(n)
-	cosigners := NewCosigners(pubKeys[:n]) // all enabled by default
+	cosigners := NewCosigners(pubKeys[:n], nil) // all enabled by default
+	if cosigners.CountTotal() != n {
+		t.Errorf("cosigners reports incorrect number of public keys")
+	}
+	if cosigners.CountEnabled() != n {
+		t.Errorf("cosigners reports incorrect number of enabled keys")
+	}
 
 	// collectively sign a test message
 	sig := testCosign(t, rightMessage, priKeys[:n], cosigners)
@@ -89,6 +95,9 @@ func TestSignVerify(t *testing.T) {
 
 	// now collectively sign with only a partial cosigners set
 	cosigners.SetMaskBit(5, Disabled)
+	if cosigners.CountEnabled() != n-1 {
+		t.Errorf("cosigners reports incorrect number of enabled keys")
+	}
 	sig = testCosign(t, rightMessage, priKeys[:n], cosigners)
 	if cosigners.Verify(rightMessage, sig) {
 		t.Errorf("signature with too few cosigners accepted")
@@ -102,6 +111,9 @@ func TestSignVerify(t *testing.T) {
 
 	// now remove another cosigner and make sure it breaks again
 	cosigners.SetMaskBit(7, Disabled)
+	if cosigners.CountEnabled() != n-2 {
+		t.Errorf("cosigners reports incorrect number of enabled keys")
+	}
 	sig = testCosign(t, rightMessage, priKeys[:n], cosigners)
 	if cosigners.Verify(rightMessage, sig) {
 		t.Errorf("signature with too few cosigners accepted")
@@ -123,8 +135,8 @@ func genInd(tb testing.TB, n int) [][]byte {
 }
 
 func benchSign(b *testing.B, nsigners int) {
-	genKeys(nsigners)                             // make sure we have enough keypairs
-	cosigners := NewCosigners(pubKeys[:nsigners]) // all enabled by default
+	genKeys(nsigners)                                  // make sure we have enough keypairs
+	cosigners := NewCosigners(pubKeys[:nsigners], nil) // all enabled by default
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		testCosign(b, rightMessage, priKeys[:nsigners], cosigners)
@@ -139,16 +151,25 @@ func benchSignInd(b *testing.B, nsigners int) {
 	}
 }
 
-func benchVerify(b *testing.B, nsigners int, cached bool) {
-	genKeys(nsigners)                             // make sure we have enough keypairs
-	cosigners := NewCosigners(pubKeys[:nsigners]) // all enabled by default
+func benchVerifyCached(b *testing.B, nsigners int) {
+	genKeys(nsigners)                                  // make sure we have enough keypairs
+	cosigners := NewCosigners(pubKeys[:nsigners], nil) // all enabled
 	sig := testCosign(b, rightMessage, priKeys[:nsigners], cosigners)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if !cached {
-			cosigners = NewCosigners(pubKeys[:nsigners])
-		}
 		if !cosigners.Verify(rightMessage, sig) {
+			b.Errorf("%d-signer signature rejected", nsigners)
+		}
+	}
+}
+
+func benchVerifyWorst(b *testing.B, nsigners int) {
+	genKeys(nsigners)                                  // make sure we have enough keypairs
+	cosigners := NewCosigners(pubKeys[:nsigners], nil) // all enabled
+	sig := testCosign(b, rightMessage, priKeys[:nsigners], cosigners)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if !Verify(pubKeys[:nsigners], nil, rightMessage, sig) {
 			b.Errorf("%d-signer signature rejected", nsigners)
 		}
 	}
@@ -204,11 +225,11 @@ func BenchmarkSign1000Individual(b *testing.B) {
 // Verification benchmarks
 
 func BenchmarkVerify1CollectiveCache(b *testing.B) {
-	benchVerify(b, 1, true)
+	benchVerifyCached(b, 1)
 }
 
 func BenchmarkVerify1CollectiveWorst(b *testing.B) {
-	benchVerify(b, 1, false)
+	benchVerifyWorst(b, 1)
 }
 
 func BenchmarkVerify1Individual(b *testing.B) {
@@ -216,11 +237,11 @@ func BenchmarkVerify1Individual(b *testing.B) {
 }
 
 func BenchmarkVerify10CollectiveCache(b *testing.B) {
-	benchVerify(b, 10, true)
+	benchVerifyCached(b, 10)
 }
 
 func BenchmarkVerify10CollectiveWorst(b *testing.B) {
-	benchVerify(b, 10, false)
+	benchVerifyWorst(b, 10)
 }
 
 func BenchmarkVerify10Individual(b *testing.B) {
@@ -228,11 +249,11 @@ func BenchmarkVerify10Individual(b *testing.B) {
 }
 
 func BenchmarkVerify100CollectiveCache(b *testing.B) {
-	benchVerify(b, 100, true)
+	benchVerifyCached(b, 100)
 }
 
 func BenchmarkVerify100CollectiveWorst(b *testing.B) {
-	benchVerify(b, 100, false)
+	benchVerifyWorst(b, 100)
 }
 
 func BenchmarkVerify100Individual(b *testing.B) {
@@ -240,14 +261,13 @@ func BenchmarkVerify100Individual(b *testing.B) {
 }
 
 func BenchmarkVerify1000CollectiveCache(b *testing.B) {
-	benchVerify(b, 1000, true)
+	benchVerifyCached(b, 1000)
 }
 
 func BenchmarkVerify1000CollectiveWorst(b *testing.B) {
-	benchVerify(b, 1000, false)
+	benchVerifyWorst(b, 1000)
 }
 
 func BenchmarkVerify1000Individual(b *testing.B) {
 	benchVerifyInd(b, 1000)
 }
-

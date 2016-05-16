@@ -162,7 +162,10 @@ func (cos *Cosigners) SetPolicy(policy Policy) {
 func Verify(publicKeys []ed25519.PublicKey, policy Policy,
 	message, sig []byte) bool {
 
-	cos := NewCosigners(publicKeys)
+	if len(sig) < ed25519.SignatureSize {
+		return false
+	}
+	cos := NewCosigners(publicKeys, sig[64:])
 	cos.SetPolicy(policy)
 	return cos.Verify(message, sig)
 }

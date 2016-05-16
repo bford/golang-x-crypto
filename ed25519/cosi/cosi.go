@@ -238,8 +238,6 @@
 package cosi
 
 import (
-	"math/big"
-
 	//"golang.org/x/crypto/ed25519"
 	//"golang.org/x/crypto/ed25519/internal/edwards25519"
 	"github.com/bford/golang-x-crypto/ed25519"
@@ -271,8 +269,9 @@ type Cosigners struct {
 	// list of all cosigners' public keys in internalized form
 	keys []edwards25519.ExtendedGroupElement
 
-	// bit-vector of *disabled* cosigners
-	mask big.Int
+	// bit-vector of *disabled* cosigners, byte-packed little-endian,
+	// or nil impplicitly all-enabled and aggr not yet computed.
+	mask []byte
 
 	// cached aggregate of all enabled cosigners' public keys
 	aggr edwards25519.ExtendedGroupElement
@@ -283,13 +282,17 @@ type Cosigners struct {
 
 // NewCosigners creates a new Cosigners object
 // for a particular list of cosigners identified by Ed25519 public keys.
+//
 // The specified list of public keys remains immutable
 // for the lifetime of this Cosigners object.
 // Collective signature verifiers must use a public key list identical
 // to the one that was used in the collective signing process,
 // although the participation bitmask may change
 // from one collective signature to the next.
-func NewCosigners(publicKeys []ed25519.PublicKey) *Cosigners {
+//
+// The mask parameter may be nil to enable all participants initially,
+// and otherwise is an initial participation bitmask as defined in SetMask.
+func NewCosigners(publicKeys []ed25519.PublicKey, mask []byte) *Cosigners {
 	var publicKeyBytes [32]byte
 	cos := &Cosigners{}
 	cos.keys = make([]edwards25519.ExtendedGroupElement, len(publicKeys))
@@ -299,7 +302,15 @@ func NewCosigners(publicKeys []ed25519.PublicKey) *Cosigners {
 			return nil
 		}
 	}
-	cos.SetMask(nil)
+
+	// Start with an all-disabled participation mask, then set it correctly
+	cos.mask = make([]byte, (len(cos.keys)+7)>>3)
+	for i := range cos.mask {
+		cos.mask[i] = 0xff // all disabled
+	}
+	cos.aggr.Zero()
+	cos.SetMask(mask)
+
 	cos.policy = fullPolicy{}
 	return cos
 }
@@ -317,7 +328,7 @@ func (cos *Cosigners) CountEnabled() int {
 	// Yes, we could count zero-bits much more efficiently...
 	count := 0
 	for i := range cos.keys {
-		if cos.MaskBit(i) == Enabled {
+		if cos.mask[i>>3]&(1<<uint(i&7)) == 0 {
 			count++
 		}
 	}
@@ -339,14 +350,22 @@ func (cos *Cosigners) CountEnabled() int {
 // SetMask conservatively interprets the bits of the missing bytes
 // to be 0, or Enabled.
 func (cos *Cosigners) SetMask(mask []byte) {
-	cos.mask.SetInt64(0)
-	cos.aggr.Zero()
 	masklen := len(mask)
 	for i := range cos.keys {
-		if (i>>3 < masklen) && (mask[i>>3]&(1<<uint(i&7)) != 0) {
-			cos.mask.SetBit(&cos.mask, i, 1) // disable
+		byt := i >> 3
+		bit := byte(1) << uint(i&7)
+		if (byt < masklen) && (mask[byt]&bit != 0) {
+			// Participant i disabled in new mask.
+			if cos.mask[byt]&bit == 0 {
+				cos.mask[byt] |= bit // disable it
+				cos.aggr.Sub(&cos.aggr, &cos.keys[i])
+			}
 		} else {
-			cos.aggr.Add(&cos.aggr, &cos.keys[i]) // enable
+			// Participant i enabled in new mask.
+			if cos.mask[byt]&bit != 0 {
+				cos.mask[byt] &^= bit // enable it
+				cos.aggr.Add(&cos.aggr, &cos.keys[i])
+			}
 		}
 	}
 }
@@ -354,13 +373,7 @@ func (cos *Cosigners) SetMask(mask []byte) {
 // Mask returns the current cosigner disable-mask
 // represented a byte-packed little-endian bit-vector.
 func (cos *Cosigners) Mask() []byte {
-	mask := make([]byte, (len(cos.keys)+7)>>3)
-	for i := 0; i < len(cos.keys); i++ {
-		if cos.mask.Bit(i) > 0 {
-			mask[i>>3] |= 1 << uint(i&7)
-		}
-	}
-	return mask
+	return append([]byte{}, cos.mask...) // return copy of internal mask
 }
 
 // MaskLen returns the length in bytes
@@ -370,15 +383,17 @@ func (cos *Cosigners) MaskLen() int {
 }
 
 // SetMaskBit enables or disables the mask bit for an individual cosigner.
-func (cos *Cosigners) SetMaskBit(signer int, bit MaskBit) {
-	if bit == Disabled { // disable
-		if cos.mask.Bit(signer) == 0 { // was enabled
-			cos.mask.SetBit(&cos.mask, signer, 1)
+func (cos *Cosigners) SetMaskBit(signer int, value MaskBit) {
+	byt := signer >> 3
+	bit := byte(1) << uint(signer&7)
+	if value == Disabled { // disable
+		if cos.mask[byt]&bit == 0 { // was enabled
+			cos.mask[byt] |= bit // disable it
 			cos.aggr.Sub(&cos.aggr, &cos.keys[signer])
 		}
 	} else { // enable
-		if cos.mask.Bit(signer) == 1 { // was disabled
-			cos.mask.SetBit(&cos.mask, signer, 0)
+		if cos.mask[byt]&bit != 0 { // was disabled
+			cos.mask[byt] &^= bit
 			cos.aggr.Add(&cos.aggr, &cos.keys[signer])
 		}
 	}
@@ -386,6 +401,8 @@ func (cos *Cosigners) SetMaskBit(signer int, bit MaskBit) {
 
 // MaskBit returns a boolean value indicating whether
 // the indicated signer is Enabled or Disabled.
-func (cos *Cosigners) MaskBit(signer int) (bit MaskBit) {
-	return cos.mask.Bit(signer) != 0
+func (cos *Cosigners) MaskBit(signer int) (value MaskBit) {
+	byt := signer >> 3
+	bit := byte(1) << uint(signer&7)
+	return (cos.mask[byt] & bit) != 0
 }
