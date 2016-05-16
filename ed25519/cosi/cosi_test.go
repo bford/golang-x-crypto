@@ -37,7 +37,7 @@ func genKeys(n int) {
 }
 
 func testCosign(tb testing.TB, message []byte, priKey []ed25519.PrivateKey,
-		cos *Cosigners) []byte {
+	cos *Cosigners) []byte {
 
 	n := len(priKey)
 
@@ -95,7 +95,7 @@ func TestSignVerify(t *testing.T) {
 	}
 
 	// now reduce the verification threshold
-	cosigners.SetPolicy(ThresholdPolicy(n-1))
+	cosigners.SetPolicy(ThresholdPolicy(n - 1))
 	if !cosigners.Verify(rightMessage, sig) {
 		t.Errorf("valid threshold not accepted")
 	}
@@ -123,7 +123,7 @@ func genInd(tb testing.TB, n int) [][]byte {
 }
 
 func benchSign(b *testing.B, nsigners int) {
-	genKeys(nsigners)	// make sure we have enough keypairs
+	genKeys(nsigners)                             // make sure we have enough keypairs
 	cosigners := NewCosigners(pubKeys[:nsigners]) // all enabled by default
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -140,7 +140,7 @@ func benchSignInd(b *testing.B, nsigners int) {
 }
 
 func benchVerify(b *testing.B, nsigners int) {
-	genKeys(nsigners)	// make sure we have enough keypairs
+	genKeys(nsigners)                             // make sure we have enough keypairs
 	cosigners := NewCosigners(pubKeys[:nsigners]) // all enabled by default
 	sig := testCosign(b, rightMessage, priKeys[:nsigners], cosigners)
 	b.ResetTimer()
@@ -227,4 +227,3 @@ func BenchmarkVerify1000Collective(b *testing.B) {
 func BenchmarkVerify1000Individual(b *testing.B) {
 	benchVerifyInd(b, 1000)
 }
-

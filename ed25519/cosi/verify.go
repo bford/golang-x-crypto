@@ -14,7 +14,6 @@ import (
 	"github.com/bford/golang-x-crypto/ed25519/internal/edwards25519"
 )
 
-
 // Policy represents a fully customizable cosigning policy
 // deciding what cosigner sets are and aren't sufficient
 // for a collective signature to be considered acceptable to a verifier.
@@ -32,11 +31,13 @@ type Policy interface {
 // The default, conservative policy
 // just requires all participants to have signed.
 type fullPolicy struct{}
+
 func (_ fullPolicy) Check(cosigners *Cosigners) bool {
 	return cosigners.CountEnabled() == cosigners.CountTotal()
 }
 
 type thresPolicy struct{ t int }
+
 func (p thresPolicy) Check(cosigners *Cosigners) bool {
 	return cosigners.CountEnabled() >= p.t
 }
@@ -47,7 +48,6 @@ func (p thresPolicy) Check(cosigners *Cosigners) bool {
 func ThresholdPolicy(threshold int) Policy {
 	return &thresPolicy{threshold}
 }
-
 
 // Verify determines whether collective signature represented by sig
 // is a valid collective signature on the indicated message,
@@ -91,7 +91,7 @@ func (cos *Cosigners) Verify(message, sig []byte) bool {
 }
 
 func (cos *Cosigners) verify(message, aggR, sigR, sigS []byte,
-		sigA edwards25519.ExtendedGroupElement) bool {
+	sigA edwards25519.ExtendedGroupElement) bool {
 
 	if len(sigR) != 32 || len(sigS) != 32 || sigS[31]&224 != 0 {
 		return false
@@ -139,7 +139,7 @@ func (cos *Cosigners) SetPolicy(policy Policy) {
 	if policy == nil {
 		policy = fullPolicy{}
 	}
-	cos.policy = policy	
+	cos.policy = policy
 }
 
 // Verify checks a collective signature on a given message,
@@ -160,7 +160,7 @@ func (cos *Cosigners) SetPolicy(policy Policy) {
 // This efficiency difference is negligible if the number of cosigners is small,
 // but may become significant in the case of many cosigners.
 func Verify(publicKeys []ed25519.PublicKey, policy Policy,
-	    message, sig []byte) bool {
+	message, sig []byte) bool {
 
 	cos := NewCosigners(publicKeys)
 	cos.SetPolicy(policy)

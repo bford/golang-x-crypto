@@ -37,7 +37,7 @@ func Example() {
 // In practice the two cosigners would be on different machines
 // ideally managed by independent administrators or key-holders.
 func Sign(message []byte, cosigners *cosi.Cosigners,
-	  priKey1, priKey2 ed25519.PrivateKey) []byte {
+	priKey1, priKey2 ed25519.PrivateKey) []byte {
 
 	// Each cosigner first needs to produce a per-message commit.
 	commit1, secret1, _ := cosi.Commit(nil)
@@ -59,4 +59,3 @@ func Sign(message []byte, cosigners *cosi.Cosigners,
 
 	return sig
 }
-
