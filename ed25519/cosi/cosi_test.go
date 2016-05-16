@@ -139,12 +139,15 @@ func benchSignInd(b *testing.B, nsigners int) {
 	}
 }
 
-func benchVerify(b *testing.B, nsigners int) {
+func benchVerify(b *testing.B, nsigners int, cached bool) {
 	genKeys(nsigners)                             // make sure we have enough keypairs
 	cosigners := NewCosigners(pubKeys[:nsigners]) // all enabled by default
 	sig := testCosign(b, rightMessage, priKeys[:nsigners], cosigners)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		if !cached {
+			cosigners = NewCosigners(pubKeys[:nsigners])
+		}
 		if !cosigners.Verify(rightMessage, sig) {
 			b.Errorf("%d-signer signature rejected", nsigners)
 		}
@@ -164,20 +167,14 @@ func benchVerifyInd(b *testing.B, nsigners int) {
 	}
 }
 
+// Signing benchmarks
+
 func BenchmarkSign1Collective(b *testing.B) {
 	benchSign(b, 1)
 }
 
 func BenchmarkSign1Individual(b *testing.B) {
 	benchSignInd(b, 1)
-}
-
-func BenchmarkVerify1Collective(b *testing.B) {
-	benchVerify(b, 1)
-}
-
-func BenchmarkVerify1Individual(b *testing.B) {
-	benchVerifyInd(b, 1)
 }
 
 func BenchmarkSign10Collective(b *testing.B) {
@@ -188,28 +185,12 @@ func BenchmarkSign10Individual(b *testing.B) {
 	benchSignInd(b, 10)
 }
 
-func BenchmarkVerify10Collective(b *testing.B) {
-	benchVerify(b, 10)
-}
-
-func BenchmarkVerify10Individual(b *testing.B) {
-	benchVerifyInd(b, 10)
-}
-
 func BenchmarkSign100Collective(b *testing.B) {
 	benchSign(b, 100)
 }
 
 func BenchmarkSign100Individual(b *testing.B) {
 	benchSignInd(b, 100)
-}
-
-func BenchmarkVerify100Collective(b *testing.B) {
-	benchVerify(b, 100)
-}
-
-func BenchmarkVerify100Individual(b *testing.B) {
-	benchVerifyInd(b, 100)
 }
 
 func BenchmarkSign1000Collective(b *testing.B) {
@@ -220,10 +201,53 @@ func BenchmarkSign1000Individual(b *testing.B) {
 	benchSignInd(b, 1000)
 }
 
-func BenchmarkVerify1000Collective(b *testing.B) {
-	benchVerify(b, 1000)
+// Verification benchmarks
+
+func BenchmarkVerify1CollectiveCache(b *testing.B) {
+	benchVerify(b, 1, true)
+}
+
+func BenchmarkVerify1CollectiveWorst(b *testing.B) {
+	benchVerify(b, 1, false)
+}
+
+func BenchmarkVerify1Individual(b *testing.B) {
+	benchVerifyInd(b, 1)
+}
+
+func BenchmarkVerify10CollectiveCache(b *testing.B) {
+	benchVerify(b, 10, true)
+}
+
+func BenchmarkVerify10CollectiveWorst(b *testing.B) {
+	benchVerify(b, 10, false)
+}
+
+func BenchmarkVerify10Individual(b *testing.B) {
+	benchVerifyInd(b, 10)
+}
+
+func BenchmarkVerify100CollectiveCache(b *testing.B) {
+	benchVerify(b, 100, true)
+}
+
+func BenchmarkVerify100CollectiveWorst(b *testing.B) {
+	benchVerify(b, 100, false)
+}
+
+func BenchmarkVerify100Individual(b *testing.B) {
+	benchVerifyInd(b, 100)
+}
+
+func BenchmarkVerify1000CollectiveCache(b *testing.B) {
+	benchVerify(b, 1000, true)
+}
+
+func BenchmarkVerify1000CollectiveWorst(b *testing.B) {
+	benchVerify(b, 1000, false)
 }
 
 func BenchmarkVerify1000Individual(b *testing.B) {
 	benchVerifyInd(b, 1000)
 }
+
