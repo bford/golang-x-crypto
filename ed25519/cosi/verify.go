@@ -136,7 +136,33 @@ func (cos *Cosigners) verify(message, aggR, sigR, sigS []byte,
 // More exotic, arbitrarily customized policies may be used
 // by passing any object that implements the Policy interface.
 func (cos *Cosigners) SetPolicy(policy Policy) {
+	if policy == nil {
+		policy = fullPolicy{}
+	}
 	cos.policy = policy	
 }
 
+// Verify checks a collective signature on a given message,
+// using a given list of public keys and acceptance policy.
+//
+// If policy is nil, then all cosigners must have participated
+// in order for the collective signature to be considered valid.
+// Another common policy to specify is ThresholdPolicy(t),
+// where t is the threshold-number of cosigners that must participate.
+// Obviously t must be greater than 0 to provide any security at all,
+// and t cannot be greater than len(publicKeys) or no signature will verify.
+//
+// This standalone function is the simplest way to verify collective signatures.
+// If the caller expects to verify many signatures consecutively
+// using the same list of public keys, however,
+// it is marginally more efficient to create a Cosigners object
+// and use Cosigners.Verify to check each successive signature.
+// This efficiency difference is negligible if the number of cosigners is small,
+// but may become significant in the case of many cosigners.
+func Verify(publicKeys []ed25519.PublicKey, policy Policy,
+	    message, sig []byte) bool {
 
+	cos := NewCosigners(publicKeys)
+	cos.SetPolicy(policy)
+	return cos.Verify(message, sig)
+}

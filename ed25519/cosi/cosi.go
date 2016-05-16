@@ -182,7 +182,8 @@
 // on a Cosigners object created from an identical list of public keys.
 //
 // The leader must keep the participation mask in its Cosigners object
-// fixed between steps 2 and 4 above.
+// fixed between steps 2 and 4 above;
+// otherwise the collective signature it produces will fail to verify.
 // If any cosigner indicates willingness in step 2
 // but then changes its mind or goes offline before step 4,
 // the leader must restart the signing process with an adjusted mask.
@@ -200,7 +201,15 @@
 // raise an alarm, and restart the signing process without that cosigner.
 // If VerifyPart indicates each individual signature part is valid,
 // then the final collective signature produced by AggregateSignature
-// will also be valid, unless the leader itself is buggy.
+// will also be valid, unless the leader is buggy.
+//
+// The standard Ed25519 scheme for individual signing
+// operates deterministically, using a cryptographic hash function internally
+// to produce the Schnorr commits it needs.
+// This deterministic operation has important simplicity and safety benefits
+// in the individual signing case,
+// but this design unfortunately does not extend readily to collective signing,
+// hence the need for fresh random input in the Commit phase above.
 //
 // Efficiency Considerations
 //
@@ -208,7 +217,7 @@
 // namely the aggregate public key returned by AggregatePublicKey -
 // reflecting the cosigners' public keys and the current participation bitmask.
 // The SetMask and SetMaskBit functions, which change the participation bitmask,
-// updates the cached cryptographic state accordingly.
+// update the cached cryptographic state accordingly.
 // As a result, both collective signing and verification operations
 // are maximally efficient when a single Cosigners object is used
 // multiple times in succession using the same, or a similar,
@@ -222,9 +231,9 @@
 // an elliptic curve point addition or subtraction operation
 // per cosigner added or removed.
 // Point addition and subtraction operations are extremely inexpensive
-// compared to the scalar multiplication operations,
-// which represent a constant base cost in collective signing or verification,
-// so these constant costs will typically dominate
+// compared to scalar multiplication operations,
+// which represent a constant base cost in collective signing or verification.
+// These constant scalar multiplication costs will thus typically dominate
 // when the list of cosigners is small.
 package cosi
 
@@ -293,7 +302,7 @@ func NewCosigners(publicKeys []ed25519.PublicKey) *Cosigners {
 		}
 	}
 	cos.SetMask(nil)
-	cos.policy = &fullPolicy{}
+	cos.policy = fullPolicy{}
 	return cos
 }
 
