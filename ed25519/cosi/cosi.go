@@ -4,6 +4,13 @@
 
 // Package cosi provides a minimal implementation
 // of collective signatures based on the Ed25519 signature scheme.
+//
+// Note: This package is experimental:
+// do not use it (yet) in security-critical contexts.
+// While collective signing is based on well-established and formally-analyzed
+// cryptographic techniques, thse implementation may have bugs or weaknesses,
+// and details of both the API and the signature format is subject to change.
+//
 // A collective signature allows many participants to
 // validate and sign a message collaboratively,
 // to produce a single compact multisignature that can be verified
