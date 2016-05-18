@@ -8,10 +8,11 @@ import (
 	"crypto/sha512"
 	"crypto/subtle"
 
-	"golang.org/x/crypto/ed25519"
-	"golang.org/x/crypto/ed25519/internal/edwards25519"
+	//"golang.org/x/crypto/ed25519"
+	//"golang.org/x/crypto/ed25519/internal/edwards25519"
+	"github.com/bford/golang-x-crypto/ed25519"
+	"github.com/bford/golang-x-crypto/ed25519/internal/edwards25519"
 )
-
 
 // Policy represents a fully customizable cosigning policy
 // deciding what cosigner sets are and aren't sufficient
@@ -30,11 +31,13 @@ type Policy interface {
 // The default, conservative policy
 // just requires all participants to have signed.
 type fullPolicy struct{}
+
 func (_ fullPolicy) Check(cosigners *Cosigners) bool {
 	return cosigners.CountEnabled() == cosigners.CountTotal()
 }
 
 type thresPolicy struct{ t int }
+
 func (p thresPolicy) Check(cosigners *Cosigners) bool {
 	return cosigners.CountEnabled() >= p.t
 }
@@ -45,7 +48,6 @@ func (p thresPolicy) Check(cosigners *Cosigners) bool {
 func ThresholdPolicy(threshold int) Policy {
 	return &thresPolicy{threshold}
 }
-
 
 // Verify determines whether collective signature represented by sig
 // is a valid collective signature on the indicated message,
@@ -80,7 +82,7 @@ func (cos *Cosigners) Verify(message, sig []byte) bool {
 	// Update our mask to reflect which cosigners actually signed
 	cos.SetMask(sig[64:])
 
-	// Check that this prepresents a sufficient set of signers
+	// Check that this represents a sufficient set of signers
 	if !cos.policy.Check(cos) {
 		return false
 	}
@@ -89,7 +91,7 @@ func (cos *Cosigners) Verify(message, sig []byte) bool {
 }
 
 func (cos *Cosigners) verify(message, aggR, sigR, sigS []byte,
-		sigA edwards25519.ExtendedGroupElement) bool {
+	sigA edwards25519.ExtendedGroupElement) bool {
 
 	if len(sigR) != 32 || len(sigS) != 32 || sigS[31]&224 != 0 {
 		return false
@@ -134,7 +136,36 @@ func (cos *Cosigners) verify(message, aggR, sigR, sigS []byte,
 // More exotic, arbitrarily customized policies may be used
 // by passing any object that implements the Policy interface.
 func (cos *Cosigners) SetPolicy(policy Policy) {
-	cos.policy = policy	
+	if policy == nil {
+		policy = fullPolicy{}
+	}
+	cos.policy = policy
 }
 
+// Verify checks a collective signature on a given message,
+// using a given list of public keys and acceptance policy.
+//
+// If policy is nil, then all cosigners must have participated
+// in order for the collective signature to be considered valid.
+// Another common policy to specify is ThresholdPolicy(t),
+// where t is the threshold-number of cosigners that must participate.
+// Obviously t must be greater than 0 to provide any security at all,
+// and t cannot be greater than len(publicKeys) or no signature will verify.
+//
+// This standalone function is the simplest way to verify collective signatures.
+// If the caller expects to verify many signatures consecutively
+// using the same list of public keys, however,
+// it is marginally more efficient to create a Cosigners object
+// and use Cosigners.Verify to check each successive signature.
+// This efficiency difference is negligible if the number of cosigners is small,
+// but may become significant in the case of many cosigners.
+func Verify(publicKeys []ed25519.PublicKey, policy Policy,
+	message, sig []byte) bool {
 
+	if len(sig) < ed25519.SignatureSize {
+		return false
+	}
+	cos := NewCosigners(publicKeys, sig[64:])
+	cos.SetPolicy(policy)
+	return cos.Verify(message, sig)
+}

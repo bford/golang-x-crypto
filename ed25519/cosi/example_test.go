@@ -3,8 +3,10 @@ package cosi_test
 import (
 	"fmt"
 
-	"golang.org/x/crypto/ed25519"
-	"golang.org/x/crypto/ed25519/cosi"
+	//"golang.org/x/crypto/ed25519"
+	//"golang.org/x/crypto/ed25519/cosi"
+	"github.com/bford/golang-x-crypto/ed25519"
+	"github.com/bford/golang-x-crypto/ed25519/cosi"
 )
 
 // This example demonstrates how to generate a
@@ -16,15 +18,14 @@ func Example() {
 	pubKey1, priKey1, _ := ed25519.GenerateKey(nil)
 	pubKey2, priKey2, _ := ed25519.GenerateKey(nil)
 	pubKeys := []ed25519.PublicKey{pubKey1, pubKey2}
-	cosigners := cosi.NewCosigners(pubKeys)
 
 	// Sign a test message.
 	message := []byte("Hello World")
-	sig := Sign(message, cosigners, priKey1, priKey2)
+	sig := Sign(message, pubKeys, priKey1, priKey2)
 
 	// Now verify the resulting collective signature.
 	// This can be done by anyone any time, not just the leader.
-	valid := cosigners.Verify(message, sig)
+	valid := cosi.Verify(pubKeys, nil, message, sig)
 	fmt.Printf("signature valid: %v", valid)
 
 	// Output:
@@ -34,8 +35,8 @@ func Example() {
 // Helper function to implement a bare-bones cosigning process.
 // In practice the two cosigners would be on different machines
 // ideally managed by independent administrators or key-holders.
-func Sign(message []byte, cosigners *cosi.Cosigners,
-	  priKey1, priKey2 ed25519.PrivateKey) []byte {
+func Sign(message []byte, pubKeys []ed25519.PublicKey,
+	priKey1, priKey2 ed25519.PrivateKey) []byte {
 
 	// Each cosigner first needs to produce a per-message commit.
 	commit1, secret1, _ := cosi.Commit(nil)
@@ -43,6 +44,7 @@ func Sign(message []byte, cosigners *cosi.Cosigners,
 	commits := []cosi.Commitment{commit1, commit2}
 
 	// The leader then combines these into an aggregate commit.
+	cosigners := cosi.NewCosigners(pubKeys, nil)
 	aggregatePublicKey := cosigners.AggregatePublicKey()
 	aggregateCommit := cosigners.AggregateCommit(commits)
 
@@ -57,4 +59,3 @@ func Sign(message []byte, cosigners *cosi.Cosigners,
 
 	return sig
 }
-

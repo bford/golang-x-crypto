@@ -10,10 +10,11 @@ import (
 	"io"
 	"strconv"
 
-	"golang.org/x/crypto/ed25519"
-	"golang.org/x/crypto/ed25519/internal/edwards25519"
+	//"golang.org/x/crypto/ed25519"
+	//"golang.org/x/crypto/ed25519/internal/edwards25519"
+	"github.com/bford/golang-x-crypto/ed25519"
+	"github.com/bford/golang-x-crypto/ed25519/internal/edwards25519"
 )
-
 
 // Commitment represents a byte-slice used in the collective signing process,
 // which cosigners produce via Commit and send to the leader
@@ -29,7 +30,7 @@ type SignaturePart []byte
 // in collectively signing a single message.
 type Secret struct {
 	reduced [32]byte
-	valid bool
+	valid   bool
 }
 
 // Commit is invoked by cosigners to produce a one-time commit
@@ -117,16 +118,15 @@ func Cosign(privateKey ed25519.PrivateKey, secret *Secret, message []byte,
 	// Produce our individual contribution to the collective signature
 	var s [32]byte
 	edwards25519.ScMulAdd(&s, &hramDigestReduced, &expandedSecretKey,
-				&secret.reduced)
+		&secret.reduced)
 
 	// Erase the one-time secret and make darn sure it gets used only once,
 	// even if a buggy caller invokes Cosign twice after a single Commit
 	secret.reduced = [32]byte{}
 	secret.valid = false
 
-	return s[:]	// individual partial signature
+	return s[:] // individual partial signature
 }
-
 
 // AggregatePublicKey computes and returns an aggregate public key
 // representing the set of cosigners
@@ -220,9 +220,7 @@ func (cos *Cosigners) AggregateSignature(aggregateR Commitment, sigParts []Signa
 // but can restart the collective signing process (with new commits)
 // after excluding the buggy or malicious cosigner.
 func (cos *Cosigners) VerifyPart(message, aggR Commitment,
-				signer int, indR, indS []byte) bool {
+	signer int, indR, indS []byte) bool {
 
 	return cos.verify(message, aggR, indR, indS, cos.keys[signer])
 }
-
-
