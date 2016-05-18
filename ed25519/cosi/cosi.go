@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package cosi provides a minimal implementation
+// Package cosi provides a basic implementation
 // of collective signatures based on the Ed25519 signature scheme.
 //
-// Note: This package is experimental:
+// Note: This package is experimental;
 // do not use it (yet) in security-critical contexts.
 // While collective signing is based on well-established and formally-analyzed
-// cryptographic techniques, thse implementation may have bugs or weaknesses,
-// and details of both the API and the signature format is subject to change.
+// cryptographic techniques, this implementation may have bugs or weaknesses,
+// and both API and signature format details are subject to change.
 //
 // A collective signature allows many participants to
 // validate and sign a message collaboratively,
@@ -25,7 +25,7 @@
 //
 // This package implements the basic cryptographic operations needed
 // to create and/or verify collective signatures using the Ed25519 curve.
-// This package does not provide a full protocol
+// This package does not provide a full distributed protocol
 // to create collective signatures, however.
 // An implementation of CoSi,
 // the scalable collective signing protocol described in the above paper,
